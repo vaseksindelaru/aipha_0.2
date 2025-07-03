@@ -60,6 +60,33 @@ def run_test():
     else:
         print("FALLO: La vela 56 NO fue detectada como Triple Coincidencia.")
         
+        print("\n--- DATOS DE DEPURACIÓN ALREDEDOR DE LA VELA 56 ---")
+        
+        # Seleccionar un slice para depuración
+        debug_slice = results_df.iloc[max(0, TARGET_INDEX - 6) : TARGET_INDEX + 5]
+        
+        # Columnas relevantes para la depuración
+        debug_cols = [
+            'is_key_candle', 
+            'in_accumulation_zone', 
+            'zone_quality_score', 
+            'is_in_trend', 
+            'trend_r_squared',
+            'is_triple_coincidence'
+        ]
+        
+        # Filtrar columnas que realmente existen en el DataFrame
+        existing_debug_cols = [col for col in debug_cols if col in debug_slice.columns]
+        
+        # Imprimir la tabla de depuración
+        print(tabulate(
+            debug_slice[existing_debug_cols], 
+            headers='keys', 
+            tablefmt='psql', 
+            showindex=True, 
+            floatfmt=".4f"
+        ))
+        
     print("="*80)
 
 if __name__ == "__main__":

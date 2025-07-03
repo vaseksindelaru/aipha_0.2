@@ -4,7 +4,7 @@ import pandas as pd
 from typing import Dict, Any
 
 # Importar nuestros bloques de construcción y componentes de la estrategia
-from aipha.building_blocks.detectors.key_candle_detector import KeyCandleDetector
+from aipha.building_blocks.detectors.key_candle_detector import SignalDetector
 from aipha.building_blocks.detectors.accumulation_zone_detector import AccumulationZoneDetector
 from aipha.building_blocks.detectors.trend_detector import TrendDetector
 from aipha.strategies.triple_coincidence.signal_combiner import SignalCombiner
@@ -48,7 +48,7 @@ class TripleCoincidenceOrchestrator:
         # --- Paso 1: Detección de Componentes Individuales ---
         # Los parámetros se extraen del diccionario de configuración
         print("Paso 1.1: Detectando Velas Clave...")
-        df_processed = KeyCandleDetector.detect(
+        df_processed = SignalDetector.detect_key_candles(
             df_processed, **self.config['key_candle']
         )
         

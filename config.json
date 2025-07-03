@@ -1,0 +1,23 @@
+{
+  "key_candle": {
+    "volume_lookback": 50,
+    "volume_percentile_threshold": 60,
+    "body_percentile_threshold": 50
+  },
+  "accumulation_zone": {
+    "volume_threshold": 0.9,
+    "atr_multiplier": 1.5,
+    "min_zone_periods": 2,
+    "volume_ma_period": 30,
+    "atr_period": 14
+  },
+  "trend": {
+    "zigzag_threshold": 0.02,
+    "min_trend_bars": 5
+  },
+  "combiner": {
+    "proximity_lookback": 8,
+    "min_zone_quality": 0.1,
+    "min_trend_r2": 0.6
+  }
+}
