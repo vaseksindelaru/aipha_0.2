@@ -4,30 +4,53 @@ from aipha.strategies.triple_coincidence.orchestrator import TripleCoincidenceOr
 from aipha.building_blocks.labelers.potential_capture_engine import get_enhanced_triple_barrier_labels # Asumiendo que esta es la ubicación
 from aipha.oracles.oracle_engine import OracleEngine
 
-# --- 1. Simulación de Datos ---
-# En un caso real, cargaríamos datos históricos desde un archivo o API
-print("Generando datos de mercado de ejemplo...")
-dates = pd.to_datetime(pd.date_range(start="2023-01-01", periods=1000, freq='5T'))
-data = {
-    'Open': np.random.uniform(95, 105, size=1000),
-    'High': np.random.uniform(100, 110, size=1000),
-    'Low': np.random.uniform(90, 100, size=1000),
-    'Close': np.random.uniform(98, 102, size=1000),
-    'Volume': np.random.uniform(1000, 5000, size=1000)
-}
-df_market = pd.DataFrame(data, index=dates)
-# Asegurarnos de que High sea el más alto y Low el más bajo
-df_market['High'] = df_market[['Open', 'High', 'Low', 'Close']].max(axis=1)
-df_market['Low'] = df_market[['Open', 'High', 'Low', 'Close']].min(axis=1)
+# --- 1. Carga de Datos ---
+# Cargar datos históricos desde los archivos descargados
+from aipha.data_system.api_client import ApiClient
+from aipha.data_system.binance_klines_fetcher import BinanceKlinesFetcher
+
+print("Cargando datos de mercado desde archivos locales...")
+api_client = ApiClient()
+fetcher = BinanceKlinesFetcher(api_client=api_client, download_dir="downloaded_data")
+
+# Especificar los detalles del archivo que queremos cargar
+df_market = fetcher.fetch_klines_as_dataframe(
+    symbol='BTCUSDT',
+    interval='5m',
+    year=2024,
+    month=4,
+    day=22
+)
+
+if df_market is None or df_market.empty:
+    raise ValueError("No se pudieron cargar los datos. Asegúrate de que el archivo exista y no esté vacío.")
+
 
 
 # --- 2. Ejecución de la Estrategia y Etiquetado ---
 # Configuración de ejemplo para la estrategia y el etiquetado
 strategy_config = {
-    'key_candle': {'volume_factor': 1.5, 'range_factor': 0.5},
-    'accumulation_zone': {'length': 10, 'volume_factor': 1.2},
-    'trend': {'length': 5, 'threshold': 0.001},
-    'combiner': {'max_distance': 3}
+    'key_candle': {
+        'volume_lookback': 50,
+        'volume_percentile_threshold': 60,
+        'body_percentile_threshold': 50
+    },
+    'accumulation_zone': {
+        'volume_threshold': 1.1,
+        'atr_multiplier': 1.0,
+        'min_zone_periods': 5,
+        'volume_ma_period': 30,
+        'atr_period': 14
+    },
+    'trend': {
+        'zigzag_threshold': 0.02,
+        'min_trend_bars': 5
+    },
+    'combiner': {
+        'proximity_lookback': 8,
+        'min_zone_quality': 0.0,
+        'min_trend_r2': 0.0
+    }
 }
 
 labeling_config = {
@@ -50,7 +73,7 @@ def simulate_potential_capture(df, events):
     short_scores = pd.Series(np.random.uniform(0.5, 5.0, size=len(events)), index=events)
     return long_scores, short_scores
 
-events_to_label = df_processed[df_processed['triple_coincidence'] == 1].index
+events_to_label = df_processed[df_processed['is_triple_coincidence'] == 1].index
 if not events_to_label.empty:
     print(f"Se encontraron {len(events_to_label)} eventos. Generando el informe forense...")
     # Aquí llamaríamos al PotentialCaptureEngine real
@@ -65,21 +88,24 @@ if not events_to_label.empty:
 
 # --- 3. Entrenamiento del Oráculo ---
 # Preparar los datos para el entrenamiento
-training_data = df_processed[df_processed['triple_coincidence'] == 1]
+training_data = df_processed[df_processed['is_triple_coincidence'] == 1]
 
 if not training_data.empty:
     # Seleccionar características (features) para el modelo
     # Estas serían las características que describen la calidad de la señal
     features = training_data[[
-        'volume_ratio', # Del Key Candle Detector
-        'zone_volume_ratio', # De Accumulation Zone
-        'trend_strength' # Del Trend Detector (simulado)
-        # ... y cualquier otra característica relevante
+        'candle_score',
+        'zone_score',
+        'trend_score',
+        'base_score',
+        'advanced_score',
+        'final_score'
     ]].copy()
     features.fillna(0, inplace=True) # Limpieza simple
 
     # Seleccionar los objetivos (targets)
-    targets = training_data[['potential_score_long', 'potential_score_short']]
+    targets_long = training_data['potential_score_long']
+    targets_short = training_data['potential_score_short']
 
     # Configuración del modelo LightGBM
     lgbm_params = {
@@ -95,17 +121,36 @@ if not training_data.empty:
         'n_jobs': -1
     }
 
-    print("Iniciando el entrenamiento del Oráculo...")
-    oracle = OracleEngine()
-    oracle.train(features, targets, lgbm_params)
+    # --- Entrenamiento del Oráculo para Longs ---
+    print("Iniciando el entrenamiento del Oráculo para Longs...")
+    oracle_long = OracleEngine()
+    oracle_long.train(features, targets_long, lgbm_params)
+    oracle_long.save_model("aipha/oracles/oracle_model_long.joblib")
 
-    # Guardar el modelo entrenado
-    oracle.save_model("aipha/oracles/oracle_model.joblib")
+    # --- Entrenamiento del Oráculo para Shorts ---
+    print("Iniciando el entrenamiento del Oráculo para Shorts...")
+    oracle_short = OracleEngine()
+    oracle_short.train(features, targets_short, lgbm_params)
+    oracle_short.save_model("aipha/oracles/oracle_model_short.joblib")
 
     # --- 4. Ejemplo de Predicción ---
     print("\nRealizando una predicción de ejemplo con los mismos datos...")
     sample_features = features.head(5)
-    predictions = oracle.predict(sample_features)
+    predictions_long_df = oracle_long.predict(sample_features, prediction_column_name='predicted_score_long')
+    predictions_short_df = oracle_short.predict(sample_features, prediction_column_name='predicted_score_short')
+
+    # Combinar las predicciones en un solo DataFrame
+    predictions = pd.concat([predictions_long_df, predictions_short_df], axis=1)
+
+    # Añadir la decisión final basada en el score más alto
+    predictions['oracle_decision'] = predictions.apply(
+        lambda row: 'long' if row['predicted_score_long'] > row['predicted_score_short'] else 'short',
+        axis=1
+    )
+    predictions['oracle_confidence'] = predictions.apply(
+        lambda row: row['predicted_score_long'] if row['oracle_decision'] == 'long' else row['predicted_score_short'],
+        axis=1
+    )
 
     print("Características de entrada de ejemplo:")
     print(sample_features)

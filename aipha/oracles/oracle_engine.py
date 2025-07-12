@@ -41,7 +41,7 @@ class OracleEngine:
 
         print("Entrenamiento del Oráculo finalizado.")
 
-    def predict(self, features: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, features: pd.DataFrame, prediction_column_name: str = 'prediction') -> pd.DataFrame:
         """
         Realiza predicciones sobre nuevos datos.
 
@@ -56,17 +56,9 @@ class OracleEngine:
 
         predictions = self.model.predict(features)
         
-        pred_df = pd.DataFrame(predictions, index=features.index, columns=['predicted_score_long', 'predicted_score_short'])
+        pred_df = pd.DataFrame(predictions, index=features.index, columns=[prediction_column_name])
         
-        # Añadir la decisión final basada en el score más alto
-        pred_df['oracle_decision'] = pred_df.apply(
-            lambda row: 'long' if row['predicted_score_long'] > row['predicted_score_short'] else 'short',
-            axis=1
-        )
-        pred_df['oracle_confidence'] = pred_df.apply(
-            lambda row: row['predicted_score_long'] if row['oracle_decision'] == 'long' else row['predicted_score_short'],
-            axis=1
-        )
+        
         
         return pred_df
 

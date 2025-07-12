@@ -68,7 +68,7 @@ class TripleCoincidenceOrchestrator:
             print("Paso 4: Etiquetando señales con PotentialCaptureEngine...")
             
             # Extraer los eventos (velas con triple coincidencia)
-            t_events = df_processed[df_processed['triple_coincidence'] == 1].index
+            t_events = df_processed[df_processed['is_triple_coincidence'] == 1].index
             
             if not t_events.empty:
                 # Llamar al motor de etiquetado
@@ -81,7 +81,7 @@ class TripleCoincidenceOrchestrator:
                 # Añadir las etiquetas al DataFrame
                 df_processed['label'] = labels
                 # Llenar los NaNs con 0 para las filas que no fueron etiquetadas
-                df_processed['label'].fillna(0, inplace=True)
+                df_processed['label'] = df_processed['label'].fillna(0)
             else:
                 print("No se encontraron eventos de triple coincidencia para etiquetar.")
                 df_processed['label'] = 0
