@@ -1,4 +1,6 @@
 import pandas as pd
+import os
+
 import numpy as np
 from aipha.strategies.triple_coincidence.orchestrator import TripleCoincidenceOrchestrator
 from aipha.building_blocks.labelers.potential_capture_engine import get_enhanced_triple_barrier_labels # Asumiendo que esta es la ubicación
@@ -43,7 +45,7 @@ strategy_config = {
         'atr_period': 14
     },
     'trend': {
-        'zigzag_threshold': 0.02,
+        'zigzag_threshold': 0.005,
         'min_trend_bars': 5
     },
     'combiner': {
@@ -156,6 +158,36 @@ if not training_data.empty:
     print(sample_features)
     print("\nPredicciones del Oráculo:")
     print(predictions)
+
+    # --- 4. Guardar Resultados en Archivos CSV ---
+    print("Guardando resultados en archivos CSV...")
+    try:
+        # Guardar los datos de entrenamiento
+        training_data_to_save = training_data[features.columns.tolist() + ['potential_score_long', 'potential_score_short']].copy()
+        training_data_to_save.index.name = 'event_timestamp'
+        training_events_path = 'training_events.csv'
+        training_data_to_save.to_csv(training_events_path, index=True)
+        print(f"Se guardaron {len(training_data_to_save)} eventos de entrenamiento en '{training_events_path}'.")
+
+        # Guardar la predicción de ejemplo
+        last_event = training_data.index[-1]
+        prediction_long = oracle_long.predict(features.tail(1), prediction_column_name='predicted_score_long').iloc[0]
+        prediction_short = oracle_short.predict(features.tail(1), prediction_column_name='predicted_score_short').iloc[0]
+        prediction_df = pd.DataFrame([{
+            'timestamp': last_event,
+            'prediction_long': prediction_long,
+            'prediction_short': prediction_short
+        }])
+        predictions_path = 'oracle_predictions.csv'
+        # Añadir al archivo si existe, de lo contrario crearlo con cabecera
+        header = not os.path.exists(predictions_path)
+        prediction_df.to_csv(predictions_path, mode='a', header=header, index=False)
+        print(f"Se guardó la predicción de ejemplo en '{predictions_path}'.")
+
+    except Exception as e:
+        print(f"Error al guardar los archivos CSV: {e}")
+
+
 
 else:
     print("No se encontraron eventos de triple coincidencia para entrenar el Oráculo.")

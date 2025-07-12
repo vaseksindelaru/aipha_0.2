@@ -13,7 +13,35 @@ DB_PASSWORD = "21blackjack" # La contraseña que estableciste
 
 # --- FUNCIÓN PRINCIPAL ---
 
-def save_results_to_cloud(df: pd.DataFrame, table_name: str):
+def create_cloud_sql_engine():
+    """
+    Initializes the connection to Google Cloud SQL and returns a SQLAlchemy engine.
+    """
+    print("Initializing Google Cloud SQL connector...")
+    connector = Connector()
+
+    def getconn() -> sqlalchemy.engine.base.Connection:
+        conn = connector.connect(
+            f"{PROJECT_ID}:{REGION}:{INSTANCE_NAME}",
+            "pg8000",
+            user=DB_USER,
+            password=DB_PASSWORD,
+            db=DB_NAME,
+        )
+        return conn
+
+    return sqlalchemy.create_engine("postgresql+pg8000://", creator=getconn)
+
+def save_results_to_cloud(df: pd.DataFrame, table_name: str, engine=None):
+    """
+    Connects to a Google Cloud SQL instance and saves a DataFrame to a table.
+    If no engine is provided, a new one is created.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the results to save.
+        table_name (str): The name of the SQL table where the data will be saved.
+        engine: An optional existing SQLAlchemy engine to use for the connection.
+    """
     """
     Conecta a una instancia de Google Cloud SQL y guarda un DataFrame en una tabla.
 
@@ -23,25 +51,10 @@ def save_results_to_cloud(df: pd.DataFrame, table_name: str):
     """
     print(f"Iniciando conexión a la base de datos en Google Cloud...")
 
-    # Inicializar el conector de Google Cloud
-    connector = Connector()
-
-    # Función para obtener la conexión a la base de datos
-    def getconn() -> sqlalchemy.engine.base.Connection:
-        conn = connector.connect(
-            f"{PROJECT_ID}:{REGION}:{INSTANCE_NAME}",  # Nombre de conexión de la instancia
-            "pg8000",
-            user=DB_USER,
-            password=DB_PASSWORD,
-            db=DB_NAME,
-        )
-        return conn
-
-    # Crear un "motor" de SQLAlchemy que usa nuestro conector seguro
-    engine = sqlalchemy.create_engine(
-        "postgresql+pg8000://",
-        creator=getconn,
-    )
+    # If no engine is provided, create a new one for this operation.
+    if engine is None:
+        print("No existing engine provided, creating a new one...")
+        engine = create_cloud_sql_engine()
 
     # Conectar y subir los datos
     with engine.connect() as db_conn:
@@ -49,10 +62,10 @@ def save_results_to_cloud(df: pd.DataFrame, table_name: str):
         
         # Usar to_sql para subir el DataFrame.
         # if_exists='replace' borrará la tabla si ya existe y la creará de nuevo.
-        # if_exists='append' añadiría los datos al final de la tabla existente.
-        df.to_sql(table_name, db_conn, if_exists="replace", index=False)
+        # if_exists='append' would add the data to the end of the existing table.
+        df.to_sql(table_name, db_conn, if_exists="append", index=False)
         
-        print("¡Datos guardados exitosamente en Google Cloud SQL!")
+        print(f"Data saved successfully to '{table_name}' in Google Cloud SQL!")
 
 # --- EJEMPLO DE USO ---
 if __name__ == '__main__':
@@ -71,5 +84,6 @@ if __name__ == '__main__':
     # 2. Definir el nombre de la tabla
     table_name = "forensic_reports_v1"
 
-    # 3. Llamar a la función para guardar los datos
-    save_results_to_cloud(df_results, table_name)
+    # 3. Create a single engine and use it to save the data
+    db_engine = create_cloud_sql_engine()
+    save_results_to_cloud(df_results, table_name, engine=db_engine)

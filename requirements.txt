@@ -1,0 +1,7 @@
+pandas
+numpy
+lightgbm
+scikit-learn
+sqlalchemy
+google-cloud-sql-connector[pg8000]
+joblib

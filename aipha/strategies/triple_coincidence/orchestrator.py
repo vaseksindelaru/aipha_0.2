@@ -80,8 +80,7 @@ class TripleCoincidenceOrchestrator:
                 
                 # Añadir las etiquetas al DataFrame
                 df_processed['label'] = labels
-                # Llenar los NaNs con 0 para las filas que no fueron etiquetadas
-                df_processed['label'] = df_processed['label'].fillna(0)
+                df_processed.loc[df_processed['label'].isnull(), 'label'] = 0
             else:
                 print("No se encontraron eventos de triple coincidencia para etiquetar.")
                 df_processed['label'] = 0

@@ -1,0 +1,4 @@
+timestamp,prediction_long,prediction_short
+281,"predicted_score_long    2.869113
+Name: 281, dtype: float64","predicted_score_short    1.991219
+Name: 281, dtype: float64"
