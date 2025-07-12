@@ -10,6 +10,8 @@ from aipha.oracles.oracle_engine import OracleEngine
 # Cargar datos históricos desde los archivos descargados
 from aipha.data_system.api_client import ApiClient
 from aipha.data_system.binance_klines_fetcher import BinanceKlinesFetcher
+# --- CAMBIO 1: Importar la función de subida ---
+from aipha.data_system.upload_results import main as upload_results_main
 
 print("Cargando datos de mercado desde archivos locales...")
 api_client = ApiClient()
@@ -66,11 +68,7 @@ print("Ejecutando la estrategia de Triple Coincidencia...")
 orchestrator = TripleCoincidenceOrchestrator(strategy_config)
 df_processed = orchestrator.run(df_market, labeling_config=labeling_config)
 
-# Simular la salida del PotentialCaptureEngine para el ejemplo
-# En un caso real, esta lógica estaría en el PotentialCaptureEngine
 def simulate_potential_capture(df, events):
-    # ... (Lógica compleja del PotentialCaptureEngine iría aquí)
-    # Por ahora, generamos datos falsos para el ejemplo
     long_scores = pd.Series(np.random.uniform(0.5, 5.0, size=len(events)), index=events)
     short_scores = pd.Series(np.random.uniform(0.5, 5.0, size=len(events)), index=events)
     return long_scores, short_scores
@@ -78,10 +76,6 @@ def simulate_potential_capture(df, events):
 events_to_label = df_processed[df_processed['is_triple_coincidence'] == 1].index
 if not events_to_label.empty:
     print(f"Se encontraron {len(events_to_label)} eventos. Generando el informe forense...")
-    # Aquí llamaríamos al PotentialCaptureEngine real
-    # df_forensic_report = PotentialCaptureEngine.run(df_processed, events_to_label, ...)
-    
-    # Simulación:
     long_scores, short_scores = simulate_potential_capture(df_processed, events_to_label)
     df_processed['potential_score_long'] = long_scores
     df_processed['potential_score_short'] = short_scores
@@ -103,7 +97,7 @@ if not training_data.empty:
         'advanced_score',
         'final_score'
     ]].copy()
-    features.fillna(0, inplace=True) # Limpieza simple
+    features.fillna(0, inplace=True)
 
     # Seleccionar los objetivos (targets)
     targets_long = training_data['potential_score_long']
@@ -111,7 +105,7 @@ if not training_data.empty:
 
     # Configuración del modelo LightGBM
     lgbm_params = {
-        'objective': 'regression_l1', # MAE
+        'objective': 'regression_l1',
         'n_estimators': 100,
         'learning_rate': 0.05,
         'num_leaves': 31,
@@ -123,28 +117,23 @@ if not training_data.empty:
         'n_jobs': -1
     }
 
-    # --- Entrenamiento del Oráculo para Longs ---
     print("Iniciando el entrenamiento del Oráculo para Longs...")
     oracle_long = OracleEngine()
     oracle_long.train(features, targets_long, lgbm_params)
     oracle_long.save_model("aipha/oracles/oracle_model_long.joblib")
 
-    # --- Entrenamiento del Oráculo para Shorts ---
     print("Iniciando el entrenamiento del Oráculo para Shorts...")
     oracle_short = OracleEngine()
     oracle_short.train(features, targets_short, lgbm_params)
     oracle_short.save_model("aipha/oracles/oracle_model_short.joblib")
 
-    # --- 4. Ejemplo de Predicción ---
     print("\nRealizando una predicción de ejemplo con los mismos datos...")
     sample_features = features.head(5)
     predictions_long_df = oracle_long.predict(sample_features, prediction_column_name='predicted_score_long')
     predictions_short_df = oracle_short.predict(sample_features, prediction_column_name='predicted_score_short')
 
-    # Combinar las predicciones en un solo DataFrame
     predictions = pd.concat([predictions_long_df, predictions_short_df], axis=1)
 
-    # Añadir la decisión final basada en el score más alto
     predictions['oracle_decision'] = predictions.apply(
         lambda row: 'long' if row['predicted_score_long'] > row['predicted_score_short'] else 'short',
         axis=1
@@ -162,14 +151,12 @@ if not training_data.empty:
     # --- 4. Guardar Resultados en Archivos CSV ---
     print("Guardando resultados en archivos CSV...")
     try:
-        # Guardar los datos de entrenamiento
         training_data_to_save = training_data[features.columns.tolist() + ['potential_score_long', 'potential_score_short']].copy()
         training_data_to_save.index.name = 'event_timestamp'
         training_events_path = 'training_events.csv'
         training_data_to_save.to_csv(training_events_path, index=True)
         print(f"Se guardaron {len(training_data_to_save)} eventos de entrenamiento en '{training_events_path}'.")
 
-        # Guardar la predicción de ejemplo
         last_event = training_data.index[-1]
         prediction_long = oracle_long.predict(features.tail(1), prediction_column_name='predicted_score_long').iloc[0]
         prediction_short = oracle_short.predict(features.tail(1), prediction_column_name='predicted_score_short').iloc[0]
@@ -179,15 +166,17 @@ if not training_data.empty:
             'prediction_short': prediction_short
         }])
         predictions_path = 'oracle_predictions.csv'
-        # Añadir al archivo si existe, de lo contrario crearlo con cabecera
         header = not os.path.exists(predictions_path)
         prediction_df.to_csv(predictions_path, mode='a', header=header, index=False)
         print(f"Se guardó la predicción de ejemplo en '{predictions_path}'.")
 
+        # --- CAMBIO 2: Llamar a la función de subida ---
+        print("\nIniciando la subida de resultados a Google Cloud...")
+        upload_results_main()
+
     except Exception as e:
-        print(f"Error al guardar los archivos CSV: {e}")
-
-
+        # Se modifica el mensaje de error para ser más genérico
+        print(f"Error durante el guardado de archivos o la subida a la nube: {e}")
 
 else:
     print("No se encontraron eventos de triple coincidencia para entrenar el Oráculo.")

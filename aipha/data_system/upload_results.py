@@ -25,8 +25,16 @@ def main():
             if os.path.exists(file_path):
                 print(f"Reading {file_path}...")
                 df = pd.read_csv(file_path)
+                print(f"DataFrame loaded for '{table_name}': shape={df.shape}")
+                print(df.head())
+                if df.empty:
+                    print(f"Warning: DataFrame for '{table_name}' is empty. Skipping upload.")
+                    continue
                 print(f"Uploading data to '{table_name}' table...")
-                save_results_to_cloud(df, table_name, engine=db_engine)
+                try:
+                    save_results_to_cloud(df, table_name, engine=db_engine)
+                except Exception as upload_err:
+                    print(f"Error uploading data to '{table_name}': {upload_err}")
             else:
                 print(f"Warning: File not found at {file_path}. Skipping upload.")
 

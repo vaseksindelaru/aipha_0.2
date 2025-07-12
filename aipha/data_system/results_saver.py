@@ -5,7 +5,7 @@ from google.cloud.sql.connector import Connector
 # --- CONFIGURACIÓN ---
 # Estos son los datos de tu instancia en Google Cloud
 PROJECT_ID = "superb-vigil-465705-d2"
-REGION = "europe-west3-a"
+REGION = "europe-west3"
 INSTANCE_NAME = "aipha022db"
 DB_NAME = "aipha_main"         # El nombre de la base de datos que creaste
 DB_USER = "postgres"           # El usuario por defecto de PostgreSQL
@@ -58,12 +58,13 @@ def save_results_to_cloud(df: pd.DataFrame, table_name: str, engine=None):
 
     # Conectar y subir los datos
     with engine.connect() as db_conn:
-        print(f"Conexión exitosa. Guardando {len(df)} filas en la tabla '{table_name}'...")
-        
-        # Usar to_sql para subir el DataFrame.
-        # if_exists='replace' borrará la tabla si ya existe y la creará de nuevo.
-        # if_exists='append' would add the data to the end of the existing table.
-        df.to_sql(table_name, db_conn, if_exists="append", index=False)
+        with db_conn.begin():  # Inicia una transacción que se confirma automáticamente
+            print(f"Conexión exitosa. Guardando {len(df)} filas en la tabla '{table_name}'...")
+            
+            # Usar to_sql para subir el DataFrame.
+            # if_exists='replace' borrará la tabla si ya existe y la creará de nuevo.
+            # if_exists='append' would add the data to the end of the existing table.
+            df.to_sql(table_name, db_conn, if_exists="append", index=False)
         
         print(f"Data saved successfully to '{table_name}' in Google Cloud SQL!")
 
