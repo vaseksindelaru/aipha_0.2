@@ -32,41 +32,15 @@ def create_cloud_sql_engine():
 
     return sqlalchemy.create_engine("postgresql+pg8000://", creator=getconn)
 
-def save_results_to_cloud(df: pd.DataFrame, table_name: str, engine=None):
-    """
-    Connects to a Google Cloud SQL instance and saves a DataFrame to a table.
-    If no engine is provided, a new one is created.
-
-    Args:
-        df (pd.DataFrame): The DataFrame containing the results to save.
-        table_name (str): The name of the SQL table where the data will be saved.
-        engine: An optional existing SQLAlchemy engine to use for the connection.
-    """
-    """
-    Conecta a una instancia de Google Cloud SQL y guarda un DataFrame en una tabla.
-
-    Args:
-        df (pd.DataFrame): El DataFrame que contiene los resultados a guardar.
-        table_name (str): El nombre de la tabla SQL donde se guardarán los datos.
-    """
-    print(f"Iniciando conexión a la base de datos en Google Cloud...")
-
-    # If no engine is provided, create a new one for this operation.
-    if engine is None:
-        print("No existing engine provided, creating a new one...")
-        engine = create_cloud_sql_engine()
-
-    # Conectar y subir los datos
-    with engine.connect() as db_conn:
-        with db_conn.begin():  # Inicia una transacción que se confirma automáticamente
-            print(f"Conexión exitosa. Guardando {len(df)} filas en la tabla '{table_name}'...")
-            
-            # Usar to_sql para subir el DataFrame.
-            # if_exists='replace' borrará la tabla si ya existe y la creará de nuevo.
-            # if_exists='append' would add the data to the end of the existing table.
-            df.to_sql(table_name, db_conn, if_exists="append", index=False)
-        
-        print(f"Data saved successfully to '{table_name}' in Google Cloud SQL!")
+def save_results_to_cloud(df, table_name):
+    try:
+        with db_conn.begin() as trans:
+            df.to_sql(table_name, db_conn, if_exists='append', index=False)
+            trans.commit()
+        print(f"Datos guardados exitosamente en {table_name}")
+    except Exception as e:
+        print(f"Error al guardar en {table_name}: {str(e)}")
+        raise
 
 # --- EJEMPLO DE USO ---
 if __name__ == '__main__':

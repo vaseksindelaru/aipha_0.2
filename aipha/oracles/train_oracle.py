@@ -158,8 +158,8 @@ if not training_data.empty:
         print(f"Se guardaron {len(training_data_to_save)} eventos de entrenamiento en '{training_events_path}'.")
 
         last_event = training_data.index[-1]
-        prediction_long = oracle_long.predict(features.tail(1), prediction_column_name='predicted_score_long').iloc[0]
-        prediction_short = oracle_short.predict(features.tail(1), prediction_column_name='predicted_score_short').iloc[0]
+        prediction_long = float(oracle_long.predict(features.tail(1))[0])
+        prediction_short = float(oracle_short.predict(features.tail(1))[0])
         prediction_df = pd.DataFrame([{
             'timestamp': last_event,
             'prediction_long': prediction_long,

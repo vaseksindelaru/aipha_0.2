@@ -3,18 +3,12 @@ import os
 from aipha.data_system.results_saver import create_cloud_sql_engine, save_results_to_cloud
 
 def main():
-    """
-    Reads results from local CSV files and uploads them to Google Cloud SQL.
-    """
-    # Define paths to the CSV files in the project root
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    training_events_csv = os.path.join(project_root, 'training_events.csv')
-    oracle_predictions_csv = os.path.join(project_root, 'oracle_predictions.csv')
-
-    files_to_upload = {
-        'training_events': training_events_csv,
-        'oracle_predictions': oracle_predictions_csv
-    }
+    for file_name, table_name in [('training_events.csv', 'training_events'), 
+                                 ('oracle_predictions.csv', 'oracle_predictions')]:
+        if os.path.exists(file_name):
+            df = pd.read_csv(file_name)
+            if not df.empty:
+                save_results_to_cloud(df, table_name)
 
     try:
         print("Initializing database connection...")
