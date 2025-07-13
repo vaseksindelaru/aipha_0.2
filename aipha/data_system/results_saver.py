@@ -8,7 +8,7 @@ PROJECT_ID = "superb-vigil-465705-d2"
 REGION = "europe-west3"
 INSTANCE_NAME = "aipha022db"
 DB_NAME = "aipha_main"         # El nombre de la base de datos que creaste
-DB_USER = "postgres"           # El usuario por defecto de PostgreSQL
+DB_USER = "aipha022db"           # El usuario por defecto de PostgreSQL
 DB_PASSWORD = "21blackjack" # La contraseña que estableciste
 
 # --- FUNCIÓN PRINCIPAL ---
